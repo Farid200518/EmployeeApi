@@ -2,16 +2,19 @@ package com.Task.EmployeeAPI.Controllers;
 
 import com.Task.EmployeeAPI.DTO.EmployeeDTO;
 import com.Task.EmployeeAPI.DTO.EmployeeLoginDTO;
+import com.Task.EmployeeAPI.DTO.TaskDTO;
 import com.Task.EmployeeAPI.Services.EmployeeService;
+import com.Task.EmployeeAPI.Services.TaskService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -21,41 +24,38 @@ import java.util.List;
 public class EmployeeController {
 
     private final EmployeeService employeeService;
+    private final TaskService taskService;
 
 
     @PostMapping("/signup")
-    public ResponseEntity<EmployeeDTO> signup(@RequestBody @Valid EmployeeDTO employeeDTO) {
-        EmployeeDTO created = employeeService.signup(employeeDTO);
-        return ResponseEntity
-                .ok()
-                .body(created);
+    public EmployeeDTO signup(@RequestBody @Valid EmployeeDTO employeeDTO) {
+        return employeeService.signup(employeeDTO);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody @Valid EmployeeLoginDTO userLoginDTO) {
+    public String login(@RequestBody @Valid EmployeeLoginDTO userLoginDTO) {
 
         String token = employeeService.login(userLoginDTO);
 
         if (token == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login failed: invalid credentials");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
 
-
-        return ResponseEntity.ok(token);
+        return token;
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('HR') or hasRole('HR_MANAGER') or hasRole('HEAD_MANAGER') or #id == authentication.principal.id")
-    public ResponseEntity<EmployeeDTO> getEmployeeById(
+    public EmployeeDTO getEmployeeById(
             @PathVariable @Min(value = 1, message = "ID must be positive") Integer id
     ) {
-        return ResponseEntity.ok(employeeService.findEmployeeById(id));
+        return employeeService.findEmployeeById(id);
     }
 
     @GetMapping
     @PreAuthorize("hasRole('HR') or hasRole('HR_MANAGER') or hasRole('HEAD_MANAGER')")
-    public ResponseEntity<List<EmployeeDTO>> getAllEmployee() {
-        return ResponseEntity.ok(employeeService.findAll());
+    public List<EmployeeDTO> getAllEmployee() {
+        return employeeService.findAll();
     }
 
     @PostMapping
@@ -67,13 +67,20 @@ public class EmployeeController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('HR') or hasRole('HR_MANAGER') or hasRole('HEAD_MANAGER')")
-    public ResponseEntity<EmployeeDTO> updateEmployeeById(@PathVariable Integer id, @Valid @RequestBody EmployeeDTO employeeDTO) {
-        return ResponseEntity.ok(employeeService.updateEmployeeById(id, employeeDTO));
+    public EmployeeDTO updateEmployeeById(@PathVariable Integer id, @Valid @RequestBody EmployeeDTO employeeDTO) {
+        return employeeService.updateEmployeeById(id, employeeDTO);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('HR_MANAGER') or hasRole('HEAD_MANAGER')")
-    public ResponseEntity<EmployeeDTO> deleteEmployeeById(@PathVariable Integer id) {
-        return ResponseEntity.ok(employeeService.deleteEmployeeById(id));
+    public EmployeeDTO deleteEmployeeById(@PathVariable Integer id) {
+        return employeeService.deleteEmployeeById(id);
+    }
+
+    @GetMapping("/{id}/tasks")
+    @PreAuthorize("hasRole('HR_MANAGER') or hasRole('HEAD_MANAGER') or #id == authentication.principal.id")
+    public List<TaskDTO> getAllEmployeeTasks(@PathVariable Integer id) {
+        EmployeeDTO employee = employeeService.findEmployeeById(id);
+        return taskService.findAllEmployeeTasks(employee.getId());
     }
 }

@@ -1,16 +1,16 @@
 package com.Task.EmployeeAPI.Controllers;
 
-import com.Task.EmployeeAPI.DTO.EmployeeDTO;
 import com.Task.EmployeeAPI.DTO.TaskDTO;
+import com.Task.EmployeeAPI.DTO.TaskWorkflowDTO;
 import com.Task.EmployeeAPI.Services.EmployeeService;
 import com.Task.EmployeeAPI.Services.TaskService;
+import com.Task.EmployeeAPI.Services.TaskWorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -21,6 +21,7 @@ public class TaskController {
 
     private final TaskService taskService;
     private final EmployeeService employeeService;
+    private final TaskWorkflowService taskWorkflowService;
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('HR_MANAGER') or hasRole('HEAD_MANAGER')")
@@ -34,19 +35,10 @@ public class TaskController {
         return taskService.findAll();
     }
 
-    @GetMapping("/employees/{id}")
-    @PreAuthorize("hasRole('HR_MANAGER') or hasRole('HEAD_MANAGER') or #id == authentication.principal.id")
-    public List<TaskDTO> getAllEmployeeTasks(@PathVariable Integer id) {
-        EmployeeDTO employee = employeeService.findEmployeeById(id);
-        List<TaskDTO> tasks = new ArrayList<>(taskService.findAll());
-        return tasks.stream()
-                .filter(task -> task.getEmployeeId() == employee.getId())
-                .toList();
-    }
-
     @PostMapping
     @PreAuthorize("hasRole('HEAD_MANAGER')")
     public TaskDTO createTask(@Valid @RequestBody TaskDTO taskDTO) {
+
         return taskService.createTask(taskDTO);
     }
 
@@ -60,5 +52,29 @@ public class TaskController {
     @PreAuthorize("hasRole('HEAD_MANAGER')")
     public TaskDTO updateTaskById(@PathVariable Integer id, @Valid @RequestBody TaskDTO taskDTO) {
         return taskService.updateTaskById(id, taskDTO);
+    }
+
+    @PostMapping("/{id}/take")
+    @PreAuthorize("hasRole('EMPLOYEE') or hasRole('HR')")
+    public TaskWorkflowDTO takeTaskWorkflow(Integer id, TaskWorkflowDTO taskWorkflowDTO){
+        return taskWorkflowService.setToInProgress(id, taskWorkflowDTO);
+    }
+
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasRole('EMPLOYEE') or hasRole('HR')")
+    public TaskWorkflowDTO submitTaskWorkflow(Integer id, TaskWorkflowDTO taskWorkflowDTO){
+        return taskWorkflowService.setToResolved(id, taskWorkflowDTO);
+    }
+
+    @PostMapping("{id}/confirm")
+    @PreAuthorize("hasRole('HEAD_MANAGER')")
+    public TaskWorkflowDTO confirmTaskWorkflow(@PathVariable Integer id, @Valid @RequestBody TaskWorkflowDTO taskWorkflowDTO) {
+        return taskWorkflowService.setToDone(id, taskWorkflowDTO);
+    }
+
+    @PostMapping("{id}/return")
+    @PreAuthorize("hasRole('HEAD_MANAGER')")
+    public TaskWorkflowDTO returnTaskWorkflow(@PathVariable Integer id, @Valid @RequestBody TaskWorkflowDTO taskWorkflowDTO) {
+        return taskWorkflowService.returnToInProgress(id, taskWorkflowDTO);
     }
 }

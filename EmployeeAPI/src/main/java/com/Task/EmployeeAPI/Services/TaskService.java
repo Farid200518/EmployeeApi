@@ -1,17 +1,25 @@
 package com.Task.EmployeeAPI.Services;
 
-import com.Task.EmployeeAPI.DAO.Entity.EmployeeEntity;
-import com.Task.EmployeeAPI.DAO.Entity.TaskEntity;
+import com.Task.EmployeeAPI.DAO.Entity.Employee;
+import com.Task.EmployeeAPI.DAO.Entity.Task;
+import com.Task.EmployeeAPI.DAO.Entity.TaskWorkflow;
+import com.Task.EmployeeAPI.DAO.Enums.Status;
+import com.Task.EmployeeAPI.DAO.Repository.EmployeeRepository;
 import com.Task.EmployeeAPI.DAO.Repository.TaskRepository;
+import com.Task.EmployeeAPI.DAO.Repository.TaskWorkflowRepository;
 import com.Task.EmployeeAPI.DTO.EmployeeDTO;
 import com.Task.EmployeeAPI.DTO.TaskDTO;
+import com.Task.EmployeeAPI.DTO.TaskWorkflowDTO;
 import com.Task.EmployeeAPI.Exceptions.BadRequestException;
 import com.Task.EmployeeAPI.Exceptions.NotFoundException;
-import com.Task.EmployeeAPI.Mappers.EmployeeMapper;
-import com.Task.EmployeeAPI.Mappers.TaskMapper;
+import com.Task.EmployeeAPI.Security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -19,9 +27,11 @@ import java.util.List;
 public class TaskService implements ITaskService{
 
     private final TaskRepository taskRepository;
+    private final EmployeeRepository employeeRepository;
     private final EmployeeService employeeService;
-    private final TaskMapper taskMapper;
-    private final EmployeeMapper employeeMapper;
+    private final TaskWorkflowService taskWorkflowService;
+    private final TaskWorkflowRepository taskWorkflowRepository;
+    private final ModelMapper modelMapper;
 
 
     @Override
@@ -32,51 +42,71 @@ public class TaskService implements ITaskService{
         if (taskDTO.getEmployeeId() == null)
             throw new BadRequestException("Employee ID must not be null!");
 
-        EmployeeDTO employeeDTO = employeeService.findEmployeeById(taskDTO.getEmployeeId());
-        EmployeeEntity employeeEntity = employeeMapper.toEntity(employeeDTO);
+        EmployeeDTO employeeDTO = employeeService
+                .findEmployeeById(taskDTO.getEmployeeId());
 
-        if (employeeEntity.isDeleted()) throw new NotFoundException("You cannot assign task to employee with ID " + employeeEntity.getId() + " , because employee was deleted!");
+        Employee employee = modelMapper.map(employeeDTO, Employee.class);
 
-        TaskEntity taskEntity = taskMapper.toEntity(taskDTO);
-        taskEntity.setEmployee(employeeEntity);
-        taskEntity = taskRepository.save(taskEntity);
-        return taskMapper.toDto(taskEntity);
+        // Employee that updates
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Employee updatedBy = employeeRepository.findByEmailAndIsDeletedFalse(userDetails.getEmail());
+
+        // Saving Task
+        Task task = modelMapper.map(taskDTO, Task.class);
+        task.setEmployee(employee);
+        taskRepository.save(task);
+
+        // Task Workflow
+        TaskWorkflow taskWorkflow = new TaskWorkflow();
+        taskWorkflow.setTask(task);
+        taskWorkflow.setStatus(Status.CREATED);
+        taskWorkflow.setLastUpdated(LocalDateTime.now());
+        taskWorkflow.setUpdatedBy(updatedBy);
+        taskWorkflowRepository.save(taskWorkflow);
+
+        return modelMapper.map(task, TaskDTO.class);
     }
 
     @Override
     public TaskDTO findTaskById(Integer id) {
-        TaskEntity taskEntity = taskRepository
-                .findById(id)
-                .orElseThrow(() -> new NotFoundException("Task with ID " + id + " doesn't exist!"));
+        Task task = taskRepository
+                .findByIdAndIsDeletedFalse(id);
 
-        if (taskEntity.isDeleted()) throw new BadRequestException("Task with ID " + id + "  is deleted!");
+        if (task == null) {
+            throw new NotFoundException("Task with id " + id + " was not found!");
+        }
 
-        return taskMapper.toDto(taskEntity);
+        return modelMapper.map(task, TaskDTO.class);
     }
 
     @Override
     public List<TaskDTO> findAll() {
         return taskRepository
-                .findAll()
+                .findByIsDeletedFalse()
                 .stream()
-                .filter(task -> !task.isDeleted())
-                .map(taskMapper::toDto)
+                .map(task -> modelMapper.map(task, TaskDTO.class))
+                .toList();
+    }
+
+    public List<TaskDTO> findAllEmployeeTasks(Integer id) {
+        Employee employee = employeeRepository.findByIdAndIsDeletedFalse(id);
+        return taskRepository
+                .findByEmployee_idAndIsDeletedFalse(employee.getId())
+                .stream()
+                .map(task -> modelMapper.map(task, TaskDTO.class))
                 .toList();
     }
 
     @Override
     public TaskDTO deleteTaskById(Integer id) {
-        TaskEntity taskEntity = taskRepository
+        Task task = taskRepository
                 .findById(id)
                 .orElseThrow(() -> new NotFoundException("Task with ID " + id + " doesn't exist!"));
 
-//        if (taskEntity.isDeleted()) {
-//            throw new BadRequestException("Task with ID " + id + " is already deleted!");
-//        }
-
-        taskEntity.setDeleted(true);
-        taskRepository.save(taskEntity);
-        return taskMapper.toDto(taskEntity);
+        task.setDeleted(true);
+        taskRepository.save(task);
+        return modelMapper.map(task, TaskDTO.class);
     }
 
     @Override
@@ -85,21 +115,20 @@ public class TaskService implements ITaskService{
             throw new BadRequestException("Employee input must not be null");
         }
 
-        TaskEntity taskEntity = taskRepository
-                .findById(id)
-                .orElseThrow(() -> new NotFoundException("Task with ID " + id + " doesn't exist!"));
+        Task task = taskRepository
+                .findByIdAndIsDeletedFalse(id);
 
-        if (taskEntity.isDeleted()) {
-            throw new NotFoundException("Task with ID " + id + " is deleted!");
+        if (task == null) {
+            throw new NotFoundException("Task with ID " + id + " doesn't exist!");
         }
 
         EmployeeDTO employeeDTO = employeeService.findEmployeeById(taskDTO.getEmployeeId());
-        EmployeeEntity employeeEntity = employeeMapper.toEntity(employeeDTO);
+        Employee employee = modelMapper.map(employeeDTO, Employee.class);
 
-        taskEntity.setDescription(taskDTO.getDescription());
-        taskEntity.setPriority(taskDTO.getPriority());
-        taskEntity.setEmployee(employeeEntity);
-        taskRepository.save(taskEntity);
-        return taskMapper.toDto(taskEntity);
+        task.setDescription(taskDTO.getDescription());
+        task.setPriority(taskDTO.getPriority());
+        task.setEmployee(employee);
+        taskRepository.save(task);
+        return modelMapper.map(task, TaskDTO.class);
     }
 }

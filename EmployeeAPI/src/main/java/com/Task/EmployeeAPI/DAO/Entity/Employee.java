@@ -14,7 +14,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Entity
 @Table(name = "employees")
-public class EmployeeEntity {
+public class Employee {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,16 +25,16 @@ public class EmployeeEntity {
 
     @Builder.Default
     private boolean isDeleted = false;
-
-    @Column(nullable = false)
     private String email;
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private Role role;
 
     @OneToMany(mappedBy = "employee")
     @Builder.Default
-    private Set<TaskEntity> tasks = new HashSet<>();
+    private Set<Task> tasks = new HashSet<>();
+
+    @OneToMany(mappedBy = "updatedBy")
+    private Set<TaskWorkflow> workflows;
 }

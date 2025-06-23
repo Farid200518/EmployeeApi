@@ -1,14 +1,15 @@
 package com.Task.EmployeeAPI.DAO.Repository;
 
-import com.Task.EmployeeAPI.DAO.Entity.EmployeeEntity;
-import com.Task.EmployeeAPI.DAO.Entity.TaskEntity;
+import com.Task.EmployeeAPI.DAO.Entity.Task;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Repository
-public interface TaskRepository extends JpaRepository<TaskEntity, Integer> {
+public interface TaskRepository extends JpaRepository<Task, Integer> {
 
-    List<TaskEntity> findByEmployee_IdAndDeletedFalse(EmployeeEntity employeeEntity);
+    Task findByIdAndIsDeletedFalse(Integer id);
+    List<Task> findByIsDeletedFalse();
+    List<Task> findByEmployee_idAndIsDeletedFalse(Integer id);
 }
