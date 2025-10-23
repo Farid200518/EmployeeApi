@@ -2,8 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/EmployeeAPI.iml" filepath="$PROJECT_DIR$/.idea/EmployeeAPI.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/EmployeeAPI.EmployeeAPI.main.iml" filepath="$PROJECT_DIR$/.idea/modules/EmployeeAPI.EmployeeAPI.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/EmployeeAPI.main.iml" filepath="$PROJECT_DIR$/.idea/modules/EmployeeAPI.main.iml" />
     </modules>
   </component>
 </project>
